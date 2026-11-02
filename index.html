@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2430">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Mi semana</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#1f2430; --muted:#8a8f99; --line:#e6e2d9; --soft:#efece5;
+    --gold:#f3a712; --ok:#4caf7d; --mid:#f3a712; --ko:#e4572e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --bg:#15171c; --card:#1e2128; --ink:#eceae4; --muted:#7d828c; --line:#2b2f38; --soft:#23262e; }
+  }
+  :root[data-theme="dark"]{ --bg:#15171c; --card:#1e2128; --ink:#eceae4; --muted:#7d828c; --line:#2b2f38; --soft:#23262e; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .app{max-width:520px;margin:0 auto;padding:12px 12px 32px}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  [hidden]{display:none!important}
+
+  /* Marcador */
+  .score{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 12px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .stat b{display:block;font-size:1.35rem;line-height:1.1}
+  .stat span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .lvl{height:6px;border-radius:3px;background:var(--soft);margin-top:6px;overflow:hidden}
+  .lvl i{display:block;height:100%;background:var(--gold);border-radius:3px;transition:width .4s}
+
+  /* Pestañas */
+  .tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--soft);border-radius:12px;padding:3px;margin-bottom:12px}
+  .tabs button{padding:9px;border-radius:10px;font-weight:600;color:var(--muted)}
+  .tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px #0002}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 10px}
+  header h1{margin:0;font-size:1.3rem;letter-spacing:-.02em}
+  header h1 small{display:block;font-size:.8rem;font-weight:400;color:var(--muted)}
+  .nav{display:flex;gap:6px}
+  .icon-btn{width:38px;height:38px;border-radius:11px;background:var(--card);border:1px solid var(--line);font-size:1.05rem}
+  .icon-btn:disabled{opacity:.3}
+
+  .week-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .week-bar .track{flex:1;height:12px;border-radius:6px;background:var(--soft);overflow:hidden}
+  .week-bar .track i{display:block;height:100%;background:linear-gradient(90deg,#4caf7d,#2a9d8f);transition:width .4s}
+  .week-bar b{font-size:.9rem;min-width:44px;text-align:right}
+
+  /* Retos */
+  .board{display:grid;grid-template-columns:minmax(88px,1.4fr) repeat(5,1fr);gap:5px;align-items:stretch}
+  .hd{text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);padding:4px 0}
+  .hd.today{color:var(--ink)}
+  .hd.today::after{content:"";display:block;width:6px;height:6px;border-radius:50%;background:var(--ink);margin:3px auto 0}
+  .hd.done{color:var(--ok)}
+  .act{display:flex;flex-direction:column;justify-content:center;padding:6px 8px;border-radius:11px;background:var(--card);
+       border:1px solid var(--line);border-left:5px solid var(--c);text-align:left;min-height:52px;overflow:hidden}
+  .act .nm{font-size:.85rem;font-weight:600;line-height:1.15;word-break:break-word}
+  .act .tm{font-size:.7rem;color:var(--muted)}
+  .cell{border-radius:11px;min-height:52px;position:relative;display:grid;place-items:center;transition:transform .12s}
+  .cell.off{background:transparent;border:1px dashed var(--line)}
+  .cell.todo{background:var(--card);border:2px solid var(--c)}
+  .cell.todo::before{content:"";position:absolute;inset:6px;border-radius:7px;background:var(--c);opacity:.12}
+  .cell.done{background:var(--c);border:2px solid var(--c);color:#fff;font-weight:800;font-size:1.2rem}
+  .cell.done::after{content:"✓"}
+  .cell.today-col{box-shadow:0 0 0 2px var(--ink) inset}
+  .pop{animation:pop .35s ease}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);margin:8px 0;font-size:.92rem}
+  .add{width:100%;margin-top:10px;padding:13px;border-radius:12px;border:1.5px dashed var(--line);color:var(--muted)}
+
+  /* Dieta: cuadrícula semanal */
+  .dboard{display:grid;grid-template-columns:minmax(62px,1.25fr) repeat(7,1fr);gap:4px;align-items:center}
+  .dhd{text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);padding:6px 0;border-radius:8px}
+  .dhd.today{color:var(--ink)}
+  .dhd.sel{background:var(--ink);color:var(--bg)}
+  .dhd.done:not(.sel){color:var(--ok)}
+  .mlabel{font-size:.72rem;font-weight:600;line-height:1.1;padding:0 2px;word-break:break-word}
+  .dcell{aspect-ratio:1;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:.95rem;color:#fff}
+  .dcell.none{border:1px dashed var(--line);color:var(--muted);font-weight:400}
+  .dcell.todo{background:var(--card);border:2px solid var(--line)}
+  .dcell.s1{background:var(--ok)} .dcell.s1::after{content:"✓"}
+  .dcell.selcol{box-shadow:0 0 0 2px var(--ink)}
+  .legend{display:flex;gap:12px;justify-content:center;font-size:.72rem;color:var(--muted);margin:8px 0 2px}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+  /* Dieta: comidas del día */
+  .dayhead{display:flex;justify-content:space-between;align-items:baseline;margin:18px 2px 8px}
+  .dayhead h2{margin:0;font-size:1.05rem}
+  .dayhead span{font-size:.85rem;color:var(--muted)}
+  .meal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+        border-radius:14px;padding:12px;margin-bottom:8px;transition:background .2s}
+  .meal .tick{flex:none;width:34px;height:34px;border-radius:50%;border:2.5px solid var(--line);display:grid;place-items:center;
+              font-weight:800;color:#fff;font-size:1.05rem}
+  .meal.s1{background:color-mix(in srgb,var(--ok) 14%,var(--card));border-color:var(--ok)}
+  .meal.s1 .tick{background:var(--ok);border-color:var(--ok)}
+  .meal.s1 .tick::after{content:"✓"}
+  .meal .body{flex:1;min-width:0}
+  .meal .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .meal .mn{font-weight:700;font-size:.95rem}
+  .meal .edit{font-size:.8rem;color:var(--muted);padding:4px 6px}
+  .meal .plan{white-space:pre-wrap;font-size:.92rem;margin-top:2px}
+  .meal.s1 .plan{text-decoration:line-through;text-decoration-color:var(--ok);opacity:.75}
+  .meal .plan.blank{color:var(--muted);font-style:italic}
+  .meal .it{display:flex;justify-content:space-between;gap:10px}
+  .meal .it .k{color:var(--muted);font-size:.8rem;white-space:nowrap}
+  .meal .mk{font-size:.8rem;color:var(--muted);font-weight:600;margin-left:auto}
+  .kcal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px}
+  .kcal .row{display:flex;justify-content:space-between;align-items:baseline;font-size:.85rem;color:var(--muted)}
+  .kcal .row b{font-size:1.15rem;color:var(--ink)}
+  .kcal .track{height:8px;border-radius:4px;background:var(--soft);overflow:hidden;margin-top:6px}
+  .kcal .track i{display:block;height:100%;background:var(--gold);transition:width .4s}
+  .irow{display:flex;gap:6px;margin-bottom:6px}
+  .irow input.kc{width:84px;flex:none;text-align:right}
+  .irow button{width:40px;flex:none;border-radius:10px;border:1px solid var(--line);color:var(--ko)}
+  .mtotal{text-align:right;margin-top:8px;font-size:.9rem;color:var(--muted)}
+  .mtotal b{color:var(--ink)}
+  .st{display:flex;gap:6px}
+  .st button{flex:1;padding:9px 0;border-radius:10px;border:1.5px solid var(--line);font-size:.85rem;font-weight:600;color:var(--muted)}
+  .st button.on1{background:var(--ok);border-color:var(--ok);color:#fff}
+  .linkbtn{display:block;margin:10px auto 0;font-size:.85rem;color:var(--muted);padding:8px}
+
+  /* Historial */
+  .hist{margin-top:22px}
+  .hist h2{font-size:.95rem;margin:0 0 8px 2px}
+  .hist-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .mini{flex:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;font-size:.68rem;color:var(--muted)}
+  .mini .g{display:grid;gap:2px;margin:0 auto 5px;width:max-content}
+  .mini .g i{width:9px;height:9px;border-radius:2px;background:var(--soft)}
+  .mini.perfect{border-color:var(--gold)}
+  .mini.perfect::before{content:"★";color:var(--gold);display:block;font-size:.8rem;line-height:1}
+
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,40px);opacity:0;
+         background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:.9rem;
+         transition:.3s;pointer-events:none;z-index:20;white-space:nowrap}
+  .toast.show{transform:translate(-50%,0);opacity:1}
+
+  /* Hojas de edición */
+  .sheet-bg{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;justify-content:center;z-index:10}
+  .sheet-bg.open{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:520px;max-height:90dvh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:0 0 6px}
+  .sheet label{display:block;font-size:.8rem;color:var(--muted);margin:12px 0 5px}
+  .sheet input,.sheet textarea{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .sheet textarea{min-height:110px;resize:vertical}
+  .days{display:flex;gap:5px}
+  .days button{flex:1;padding:10px 0;border-radius:10px;border:1.5px solid var(--line);font-weight:700}
+  .days button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .swatches{display:flex;flex-wrap:wrap;gap:10px}
+  .sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent}
+  .sw.sel{border-color:var(--ink)}
+  .slot{display:flex;gap:6px;margin-bottom:6px}
+  .slot button{width:42px;border-radius:10px;border:1px solid var(--line);color:var(--ko)}
+  .actions{display:flex;gap:8px;margin-top:18px}
+  .actions button{flex:1;padding:12px;border-radius:12px;font-weight:600}
+  .primary{background:var(--ink);color:var(--bg)}
+  .danger{color:var(--ko);border:1px solid var(--line)!important}
+  .ghost{border:1px solid var(--line)!important}
+
+  footer{margin-top:22px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  footer button{font-size:.8rem;color:var(--muted);padding:8px 10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="score">
+    <div class="stat"><span>Nivel</span><b id="lvl">1</b><div class="lvl"><i id="lvlBar"></i></div></div>
+    <div class="stat"><span>Puntos</span><b id="pts">0</b></div>
+    <div class="stat"><span id="streakLbl">Racha ★</span><b id="streak">0</b></div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabRetos">Retos</button>
+    <button id="tabDieta">Dieta</button>
+  </div>
+
+  <header>
+    <h1 id="wkTitle"></h1>
+    <div class="nav">
+      <button class="icon-btn" id="prev" aria-label="Semana anterior">‹</button>
+      <button class="icon-btn" id="next" aria-label="Semana siguiente">›</button>
+    </div>
+  </header>
+
+  <div class="week-bar"><div class="track"><i id="wkBar"></i></div><b id="wkPct">0%</b></div>
+
+  <!-- RETOS -->
+  <section id="vRetos">
+    <div class="board" id="board"></div>
+    <div class="empty" id="empty" hidden>Añade tu primera actividad.<br>Se repetirá cada semana.</div>
+    <button class="add" id="addBtn">+ Añadir actividad</button>
+  </section>
+
+  <!-- DIETA -->
+  <section id="vDieta" hidden>
+    <div class="empty" id="dEmpty" hidden>Primero escribe tu plan: toca cada comida de abajo y pon lo que toca.<br>Puedes copiar lo mismo a varios días de una vez.</div>
+    <div class="dboard" id="dboard"></div>
+    <div class="legend"><span><i style="background:var(--ok)"></i>Hecha</span><span><i style="border:2px solid var(--line)"></i>Pendiente</span><span><i style="border:1px dashed var(--line)"></i>Sin plan</span></div>
+    <div class="dayhead"><h2 id="dayTitle"></h2><span id="dayCount"></span></div>
+    <div class="kcal" id="kcalBox" hidden>
+      <div class="row"><span><b id="kEaten">0</b> kcal comidas</span><span>de <span id="kPlan">0</span> del plan</span></div>
+      <div class="track"><i id="kBar"></i></div>
+    </div>
+    <div id="meals"></div>
+    <button class="linkbtn" id="slotsBtn">Cambiar las comidas del día (desayuno, comida…)</button>
+  </section>
+
+  <section class="hist">
+    <h2>Semanas anteriores</h2>
+    <div class="hist-row" id="hist"></div>
+  </section>
+
+  <footer>
+    <button id="exportBtn">Exportar copia</button>
+    <button id="importBtn">Importar copia</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Hoja: actividad -->
+<div class="sheet-bg" id="actSheet">
+  <form class="sheet" id="actForm">
+    <h3 id="formTitle">Nueva actividad</h3>
+    <label for="fName">Nombre</label>
+    <input id="fName" required maxlength="30" autocomplete="off" placeholder="Ej. Ruso, Gimnasio…">
+    <label for="fTime">Hora (opcional, ordena las filas)</label>
+    <input type="time" id="fTime">
+    <label>Días</label>
+    <div class="days" id="fDays"></div>
+    <label>Color</label>
+    <div class="swatches" id="swatches"></div>
+    <div class="actions">
+      <button type="button" class="danger" id="delBtn">Borrar</button>
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Hoja: plan de una comida -->
+<div class="sheet-bg" id="mealSheet">
+  <form class="sheet" id="mealForm">
+    <h3 id="mealTitle"></h3>
+    <label>Alimentos y kcal</label>
+    <div id="mItems"></div>
+    <button type="button" class="add" id="mAdd" style="margin-top:2px">+ Añadir alimento</button>
+    <div class="mtotal">Total: <b id="mTotal">0</b> kcal</div>
+    <label>Guardar también en estos días</label>
+    <div class="days" id="mDays"></div>
+    <div class="actions">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Hoja: comidas del día -->
+<div class="sheet-bg" id="slotsSheet">
+  <form class="sheet" id="slotsForm">
+    <h3>Comidas del día</h3>
+    <div id="slotList" style="margin-top:12px"></div>
+    <button type="button" class="add" id="slotAdd">+ Añadir comida</button>
+    <div class="actions">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const COLORS=['#e4572e','#f3a712','#e9b949','#4caf7d','#2a9d8f','#3a86ff','#8e5cd9','#e05ba0','#7d828c'];
+const DAYS=['L','M','X','J','V'];
+const DDAYS=['L','M','X','J','V','S','D'];
+const DLARGO=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const KEY='mi-semana.v1', TABKEY='mi-semana.tab';
+const PTS_CELL=10, PTS_DAY=20, PTS_WEEK=100, PTS_LEVEL=200;
+const PTS_MEAL=10;
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const DEFAULT_MEALS=['Desayuno','Media mañana','Comida','Merienda','Cena'].map((n,i)=>({id:'m'+i,name:n}));
+
+let state=load();
+let tab=(()=>{ try{ return localStorage.getItem(TABKEY)||'retos'; }catch{ return 'retos'; } })();
+let week=monday(new Date());
+let selDay=todayIdx7();
+
+function load(){
+  let s=null; try{ s=JSON.parse(localStorage.getItem(KEY)); }catch{}
+  if(!s||!s.acts||!s.log) s={acts:[],log:{}};
+  if(!s.diet) s.diet={meals:DEFAULT_MEALS.map(m=>({...m})),plan:{},log:{}};
+  return normalize(s);
+}
+function normalize(s){
+  // Solo existe "hecha" (1): limpia estados antiguos
+  Object.values(s.diet.log).forEach(w=>Object.keys(w).forEach(k=>{ if(w[k]!==1) delete w[k]; }));
+  // Planes antiguos en texto → lista de alimentos (una línea = un alimento)
+  Object.keys(s.diet.plan).forEach(k=>{ const v=s.diet.plan[k];
+    if(typeof v==='string') s.diet.plan[k]={items:v.split('\n').map(n=>n.trim()).filter(Boolean).map(n=>({n,k:0}))}; });
+  return s;
+}
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch{} }
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function monday(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function todayIdx7(){ return (new Date().getDay()+6)%7; }
+function esc(t){ return t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- RETOS ---------- */
+function sortedActs(){ return [...state.acts].sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')); }
+function isDone(wk,act,day){ return (state.log[wk]?.[act]||[]).includes(day); }
+function weekStats(wk){
+  let planned=0, done=0; const perDay=[0,0,0,0,0], perDayDone=[0,0,0,0,0];
+  state.acts.forEach(a=>a.days.forEach(d=>{ planned++; perDay[d]++; if(isDone(wk,a.id,d)){done++; perDayDone[d]++;} }));
+  return {planned,done,perDay,perDayDone,perfect:planned>0&&done===planned};
+}
+function retosPoints(){
+  let p=0;
+  Object.keys(state.log).forEach(wk=>{
+    const s=weekStats(wk); p+=s.done*PTS_CELL;
+    s.perDay.forEach((n,i)=>{ if(n&&s.perDayDone[i]===n) p+=PTS_DAY; });
+    if(s.perfect) p+=PTS_WEEK;
+  });
+  return p;
+}
+function retosStreak(){
+  let n=0, w=monday(new Date());
+  if(weekStats(iso(w)).perfect) n++;
+  w=addDays(w,-7);
+  while(weekStats(iso(w)).perfect){ n++; w=addDays(w,-7); }
+  return n;
+}
+
+/* ---------- DIETA ---------- */
+const dk=(d,m)=>d+'|'+m;
+const items=(d,m)=>state.diet.plan[dk(d,m)]?.items||[];
+const planText=(d,m)=>items(d,m).map(i=>i.n).join('\n');
+const kcalOf=(d,m)=>items(d,m).reduce((a,i)=>a+(+i.k||0),0);
+const fmt=n=>Math.round(n).toLocaleString('es-ES');
+const dStatus=(wk,d,m)=>state.diet.log[wk]?.[dk(d,m)]===1?1:0;   // 1 hecha, 0 pendiente
+function dietStats(wk){
+  let planned=0, n1=0; const dayP=Array(7).fill(0), dayOk=Array(7).fill(0);
+  state.diet.meals.forEach(m=>{ for(let d=0;d<7;d++){
+    if(!planText(d,m.id)) continue;
+    planned++; dayP[d]++;
+    if(dStatus(wk,d,m.id)){ n1++; dayOk[d]++; }
+  }});
+  return {planned,score:n1,n1,dayP,dayOk,perfect:planned>0&&n1===planned};
+}
+function dietPoints(){
+  let p=0;
+  Object.keys(state.diet.log).forEach(wk=>{
+    const s=dietStats(wk); p+=s.n1*PTS_MEAL;
+    s.dayP.forEach((n,i)=>{ if(n&&s.dayOk[i]===n) p+=PTS_DAY; });
+    if(s.perfect) p+=PTS_WEEK;
+  });
+  return p;
+}
+function dietStreak(){            // días seguidos cumpliendo todas las comidas
+  const info=d=>{ const s=dietStats(iso(monday(d))); const i=(d.getDay()+6)%7; return [s.dayP[i],s.dayOk[i]]; };
+  let d=new Date(), n=0, [p,o]=info(d);
+  if(p&&o===p) n++;
+  for(let k=0;k<400;k++){
+    d=addDays(d,-1); [p,o]=info(d);
+    if(p&&o===p) n++; else break;
+  }
+  return n;
+}
+
+/* ---------- PINTAR ---------- */
+function render(){
+  const wk=iso(week), thisWk=iso(monday(new Date()));
+  const end=addDays(week, tab==='dieta'?6:4);
+  const label = wk===thisWk ? 'Esta semana' : wk===iso(addDays(monday(new Date()),-7)) ? 'Semana pasada' : 'Semana';
+  document.getElementById('wkTitle').innerHTML=`${label}<small>${week.getDate()} ${MESES[week.getMonth()]} – ${end.getDate()} ${MESES[end.getMonth()]}</small>`;
+  document.getElementById('next').disabled = wk>=thisWk;
+  document.getElementById('tabRetos').className = tab==='retos'?'on':'';
+  document.getElementById('tabDieta').className = tab==='dieta'?'on':'';
+  document.getElementById('vRetos').hidden = tab!=='retos';
+  document.getElementById('vDieta').hidden = tab!=='dieta';
+
+  let pct=0;
+  if(tab==='retos'){ const s=weekStats(wk); pct=s.planned?Math.round(s.done*100/s.planned):0; renderRetos(wk,thisWk); }
+  else { const s=dietStats(wk); pct=s.planned?Math.round(s.score*100/s.planned):0; renderDieta(wk,thisWk); }
+  document.getElementById('wkBar').style.width=pct+'%';
+  document.getElementById('wkPct').textContent=pct+'%';
+
+  const p=retosPoints()+dietPoints();
+  document.getElementById('pts').textContent=p;
+  document.getElementById('lvl').textContent=Math.floor(p/PTS_LEVEL)+1;
+  document.getElementById('lvlBar').style.width=((p%PTS_LEVEL)*100/PTS_LEVEL)+'%';
+  if(tab==='retos'){ document.getElementById('streakLbl').textContent='Racha ★'; document.getElementById('streak').textContent=retosStreak(); }
+  else { document.getElementById('streakLbl').textContent='Racha días'; document.getElementById('streak').textContent=dietStreak(); }
+  renderHist();
+}
+
+function renderRetos(wk,thisWk){
+  const todayIdx = wk===thisWk ? todayIdx7() : -1;
+  const st=weekStats(wk);
+  const board=document.getElementById('board'); board.innerHTML='<div></div>';
+  DAYS.forEach((d,i)=>{
+    const h=document.createElement('div');
+    h.className='hd'+(i===todayIdx?' today':'')+(st.perDay[i]&&st.perDayDone[i]===st.perDay[i]?' done':'');
+    h.textContent=d; board.appendChild(h);
+  });
+  sortedActs().forEach(a=>{
+    const name=document.createElement('button'); name.className='act'; name.style.setProperty('--c',a.color);
+    name.innerHTML=`<span class="nm">${esc(a.name)}</span>`+(a.time?`<span class="tm">${a.time}</span>`:'');
+    name.onclick=()=>openAct(a);
+    board.appendChild(name);
+    DAYS.forEach((_,i)=>{
+      const c=document.createElement('button'); c.style.setProperty('--c',a.color);
+      const planned=a.days.includes(i);
+      c.className='cell '+(!planned?'off':isDone(wk,a.id,i)?'done':'todo')+(i===todayIdx&&planned?' today-col':'');
+      c.dataset.k=a.id+'|'+i;
+      if(planned) c.onclick=()=>toggleReto(a,i); else c.disabled=true;
+      board.appendChild(c);
+    });
+  });
+  document.getElementById('empty').hidden = state.acts.length>0;
+  board.hidden = state.acts.length===0;
+}
+
+function renderDieta(wk,thisWk){
+  const todayIdx = wk===thisWk ? todayIdx7() : -1;
+  const st=dietStats(wk), meals=state.diet.meals;
+  document.getElementById('dEmpty').hidden = st.planned>0;
+
+  const b=document.getElementById('dboard'); b.innerHTML='<div></div>';
+  DDAYS.forEach((d,i)=>{
+    const h=document.createElement('button');
+    h.className='dhd'+(i===todayIdx?' today':'')+(i===selDay?' sel':'')+(st.dayP[i]&&st.dayOk[i]===st.dayP[i]?' done':'');
+    h.textContent=d; h.onclick=()=>{ selDay=i; render(); };
+    b.appendChild(h);
+  });
+  meals.forEach(m=>{
+    const l=document.createElement('div'); l.className='mlabel'; l.textContent=m.name; b.appendChild(l);
+    for(let d=0;d<7;d++){
+      const c=document.createElement('button');
+      const has=!!planText(d,m.id), s=dStatus(wk,d,m.id);
+      c.className='dcell '+(!has?'none':s?'s'+s:'todo')+(d===selDay?' selcol':'');
+      c.dataset.k=dk(d,m.id);
+      c.setAttribute('aria-label',m.name+' '+DLARGO[d]);
+      c.onclick=()=>{
+        selDay=d;
+        if(!has){ render(); openMeal(d,m); return; }
+        setMeal(d,m.id, s?0:1);           // toque rápido: cumplida / borrar
+      };
+      b.appendChild(c);
+    }
+  });
+
+  const date=addDays(week,selDay);
+  document.getElementById('dayTitle').textContent=`${DLARGO[selDay]} ${date.getDate()} ${MESES[date.getMonth()]}`;
+  document.getElementById('dayCount').textContent = st.dayP[selDay] ? `${st.dayOk[selDay]}/${st.dayP[selDay]} hechas` : '';
+
+  let kPlan=0, kEat=0;
+  meals.forEach(m=>{ const k=kcalOf(selDay,m.id); kPlan+=k; if(dStatus(wk,selDay,m.id)) kEat+=k; });
+  document.getElementById('kcalBox').hidden = !kPlan;
+  document.getElementById('kEaten').textContent=fmt(kEat);
+  document.getElementById('kPlan').textContent=fmt(kPlan);
+  document.getElementById('kBar').style.width=(kPlan?Math.min(100,kEat*100/kPlan):0)+'%';
+
+  const box=document.getElementById('meals'); box.innerHTML='';
+  meals.forEach(m=>{
+    const its=items(selDay,m.id), t=its.length, s=dStatus(wk,selDay,m.id), k=kcalOf(selDay,m.id);
+    const card=document.createElement('div'); card.className='meal'+(s?' s1':''); card.setAttribute('role','button');
+    card.dataset.k='c'+dk(selDay,m.id);
+    const list = t ? its.map(i=>`<div class="it"><span>${esc(i.n)}</span><span class="k">${+i.k?fmt(+i.k)+' kcal':''}</span></div>`).join('')
+                   : 'Sin plan · toca para escribirlo';
+    card.innerHTML=`${t?'<span class="tick"></span>':''}<div class="body"><div class="top"><span class="mn">${esc(m.name)}</span>${k?`<span class="mk">${fmt(k)} kcal</span>`:''}<button class="edit">Editar</button></div>
+      <div class="plan${t?'':' blank'}">${list}</div></div>`;
+    card.querySelector('.edit').onclick=e=>{ e.stopPropagation(); openMeal(selDay,m); };
+    card.onclick=()=> t ? setMeal(selDay,m.id, s?0:1) : openMeal(selDay,m);
+    box.appendChild(card);
+  });
+}
+
+function renderHist(){
+  const box=document.getElementById('hist'); box.innerHTML='';
+  let w=addDays(monday(new Date()),-7), shown=0;
+  const dieta = tab==='dieta';
+  for(let k=0;k<12;k++,w=addDays(w,-7)){
+    const wk=iso(w);
+    if(dieta ? !state.diet.log[wk] : !state.log[wk]) continue;
+    let g, pct, perfect;
+    if(!dieta){
+      const s=weekStats(wk); perfect=s.perfect; pct=s.planned?Math.round(s.done*100/s.planned):0;
+      g='<div class="g" style="grid-template-columns:repeat(5,9px)">';
+      sortedActs().forEach(a=>DAYS.forEach((_,i)=>{
+        const on=a.days.includes(i)&&isDone(wk,a.id,i);
+        g+=`<i style="${on?'background:'+a.color:a.days.includes(i)?'':'opacity:.3'}"></i>`;
+      }));
+    }else{
+      const s=dietStats(wk); perfect=s.perfect; pct=s.planned?Math.round(s.score*100/s.planned):0;
+      g='<div class="g" style="grid-template-columns:repeat(7,9px)">';
+      state.diet.meals.forEach(m=>{ for(let d=0;d<7;d++){
+        const st=dStatus(wk,d,m.id);
+        g+=`<i style="${!planText(d,m.id)?'opacity:.3':st?'background:var(--ok)':''}"></i>`;
+      }});
+    }
+    const m=document.createElement('button'); m.className='mini'+(perfect?' perfect':'');
+    m.innerHTML=g+`</div>${w.getDate()} ${MESES[w.getMonth()]} · ${pct}%`;
+    const target=new Date(w);
+    m.onclick=()=>{ week=target; selDay=0; render(); scrollTo({top:0,behavior:'smooth'}); };
+    box.appendChild(m); shown++;
+  }
+  if(!shown) box.innerHTML='<span style="color:var(--muted);font-size:.85rem;padding:2px">Aquí irán apareciendo tus semanas.</span>';
+}
+
+/* ---------- ACCIONES ---------- */
+function popCell(k){ document.querySelector(`[data-k="${k}"]`)?.classList.add('pop'); }
+
+function toggleReto(a,i){
+  const wk=iso(week);
+  state.log[wk] ??= {}; state.log[wk][a.id] ??= [];
+  const arr=state.log[wk][a.id]; const before=weekStats(wk);
+  const idx=arr.indexOf(i);
+  if(idx>=0) arr.splice(idx,1); else arr.push(i);
+  save(); const after=weekStats(wk); render();
+  if(idx<0){
+    navigator.vibrate?.(15); popCell(a.id+'|'+i);
+    if(after.perfect && !before.perfect) toast('★ ¡Semana perfecta! +'+PTS_WEEK);
+    else if(after.perDay[i]===after.perDayDone[i] && before.perDayDone[i]<before.perDay[i]) toast('Día '+DAYS[i]+' completo +'+PTS_DAY);
+    else toast('+'+PTS_CELL);
+  }
+}
+
+function setMeal(d,mid,v){
+  const wk=iso(week);
+  state.diet.log[wk] ??= {};
+  const before=dietStats(wk);
+  if(v) state.diet.log[wk][dk(d,mid)]=v; else delete state.diet.log[wk][dk(d,mid)];
+  save(); const after=dietStats(wk); render();
+  if(!v) return;
+  navigator.vibrate?.(15); popCell(dk(d,mid)); popCell('c'+dk(d,mid));
+  if(after.perfect && !before.perfect) toast('★ ¡Semana de dieta perfecta! +'+PTS_WEEK);
+  else if(after.dayOk[d]===after.dayP[d] && before.dayOk[d]<before.dayP[d]) toast(DLARGO[d]+' perfecto +'+PTS_DAY);
+  else toast('+'+PTS_MEAL);
+}
+
+let tt; function toast(t){ const e=document.getElementById('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>e.classList.remove('show'),1500); }
+
+/* ---------- HOJAS ---------- */
+const openSheet=id=>document.getElementById(id).classList.add('open');
+const closeSheets=()=>document.querySelectorAll('.sheet-bg').forEach(s=>s.classList.remove('open'));
+document.querySelectorAll('.sheet-bg').forEach(s=>s.addEventListener('click',e=>{ if(e.target===s) closeSheets(); }));
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);
+
+function dayPicker(boxId,labels,sel,onChange){
+  const box=document.getElementById(boxId); box.innerHTML='';
+  labels.forEach((d,i)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=d;
+    b.className=sel.includes(i)?'on':''; b.onclick=()=>onChange(sel.includes(i)?sel.filter(x=>x!==i):[...sel,i].sort());
+    box.appendChild(b); });
+}
+
+// Actividad (retos)
+let editing=null, fColor=COLORS[5], fDays=[0,1,2,3,4];
+function drawActForm(){
+  dayPicker('fDays',DAYS,fDays,v=>{ fDays=v; drawActForm(); });
+  const sBox=document.getElementById('swatches'); sBox.innerHTML='';
+  COLORS.forEach(c=>{ const s=document.createElement('button'); s.type='button'; s.className='sw'+(c===fColor?' sel':'');
+    s.style.background=c; s.onclick=()=>{ fColor=c; drawActForm(); }; sBox.appendChild(s); });
+}
+function openAct(a){
+  editing=a||null;
+  document.getElementById('formTitle').textContent=a?'Editar actividad':'Nueva actividad';
+  document.getElementById('fName').value=a?a.name:'';
+  document.getElementById('fTime').value=a?(a.time||''):'';
+  fDays=a?[...a.days]:[0,1,2,3,4];
+  fColor=a?a.color:COLORS[state.acts.length%COLORS.length];
+  document.getElementById('delBtn').style.display=a?'':'none';
+  drawActForm(); openSheet('actSheet');
+}
+document.getElementById('actForm').onsubmit=e=>{
+  e.preventDefault();
+  if(!fDays.length){ toast('Elige al menos un día'); return; }
+  const data={name:document.getElementById('fName').value.trim(), time:document.getElementById('fTime').value||null, color:fColor, days:fDays};
+  if(editing) Object.assign(editing,data); else state.acts.push({id:uid(),...data});
+  save(); closeSheets(); render();
+};
+document.getElementById('delBtn').onclick=()=>{
+  if(editing&&confirm(`¿Borrar "${editing.name}"? Se pierde también su historial.`)){
+    state.acts=state.acts.filter(x=>x!==editing);
+    Object.values(state.log).forEach(w=>delete w[editing.id]);
+    save(); closeSheets(); render();
+  }
+};
+document.getElementById('addBtn').onclick=()=>openAct(null);
+
+// Plan de una comida
+let mEdit=null, mDays=[], mIts=[];
+function drawItems(){
+  const box=document.getElementById('mItems'); box.innerHTML='';
+  mIts.forEach((it,i)=>{
+    const r=document.createElement('div'); r.className='irow';
+    r.innerHTML=`<input placeholder="Ej. 60 g de avena" maxlength="60" value="${esc(it.n)}"><input class="kc" type="number" inputmode="numeric" min="0" placeholder="kcal" value="${it.k||''}"><button type="button" aria-label="Quitar">✕</button>`;
+    const [n,k]=r.querySelectorAll('input');
+    n.oninput=()=>it.n=n.value; k.oninput=()=>{ it.k=+k.value||0; sumItems(); };
+    r.querySelector('button').onclick=()=>{ mIts.splice(i,1); if(!mIts.length) mIts.push({n:'',k:0}); drawItems(); };
+    box.appendChild(r);
+  });
+  sumItems();
+}
+function sumItems(){ document.getElementById('mTotal').textContent=fmt(mIts.reduce((a,i)=>a+(+i.k||0),0)); }
+document.getElementById('mAdd').onclick=()=>{ mIts.push({n:'',k:0}); drawItems(); document.querySelector('#mItems .irow:last-child input').focus(); };
+function openMeal(d,m){
+  mEdit={d,m}; mDays=[d];
+  document.getElementById('mealTitle').textContent=`${m.name} · ${DLARGO[d]}`;
+  mIts=items(d,m.id).map(i=>({...i})); if(!mIts.length) mIts=[{n:'',k:0}];
+  drawItems();
+  const draw=()=>dayPicker('mDays',DDAYS,mDays,v=>{ mDays=v.includes(d)?v:[...v,d].sort(); draw(); });
+  draw(); openSheet('mealSheet');
+}
+document.getElementById('mealForm').onsubmit=e=>{
+  e.preventDefault();
+  const its=mIts.map(i=>({n:i.n.trim(),k:+i.k||0})).filter(i=>i.n);
+  mDays.forEach(d=>{ const key=dk(d,mEdit.m.id); if(its.length) state.diet.plan[key]={items:its.map(i=>({...i}))}; else delete state.diet.plan[key]; });
+  save(); closeSheets(); render();
+  if(its.length && mDays.length>1) toast(`Guardado en ${mDays.length} días`);
+};
+
+// Comidas del día
+let slots=[];
+function drawSlots(){
+  const box=document.getElementById('slotList'); box.innerHTML='';
+  slots.forEach((s,i)=>{
+    const row=document.createElement('div'); row.className='slot';
+    row.innerHTML=`<input value="${esc(s.name)}" maxlength="20" required><button type="button" aria-label="Quitar">✕</button>`;
+    row.querySelector('input').oninput=e=>s.name=e.target.value;
+    row.querySelector('button').onclick=()=>{ slots.splice(i,1); drawSlots(); };
+    box.appendChild(row);
+  });
+}
+document.getElementById('slotsBtn').onclick=()=>{ slots=state.diet.meals.map(m=>({...m})); drawSlots(); openSheet('slotsSheet'); };
+document.getElementById('slotAdd').onclick=()=>{ slots.push({id:uid(),name:''}); drawSlots(); document.querySelector('#slotList .slot:last-child input').focus(); };
+document.getElementById('slotsForm').onsubmit=e=>{
+  e.preventDefault();
+  const keep=slots.filter(s=>s.name.trim()).map(s=>({id:s.id,name:s.name.trim()}));
+  if(!keep.length){ toast('Deja al menos una comida'); return; }
+  const ids=new Set(keep.map(s=>s.id));
+  const removed=state.diet.meals.filter(m=>!ids.has(m.id));
+  if(removed.length && !confirm(`Se borrará el plan y el historial de: ${removed.map(m=>m.name).join(', ')}. ¿Seguir?`)) return;
+  const gone=k=>!ids.has(k.split('|')[1]);
+  Object.keys(state.diet.plan).forEach(k=>{ if(gone(k)) delete state.diet.plan[k]; });
+  Object.values(state.diet.log).forEach(w=>Object.keys(w).forEach(k=>{ if(gone(k)) delete w[k]; }));
+  state.diet.meals=keep; save(); closeSheets(); render();
+};
+
+/* ---------- NAVEGACIÓN ---------- */
+function setTab(t){ tab=t; try{ localStorage.setItem(TABKEY,t); }catch{} render(); }
+document.getElementById('tabRetos').onclick=()=>setTab('retos');
+document.getElementById('tabDieta').onclick=()=>setTab('dieta');
+function goWeek(n){ week=addDays(week,7*n); selDay = iso(week)===iso(monday(new Date())) ? todayIdx7() : 0; render(); }
+document.getElementById('prev').onclick=()=>goWeek(-1);
+document.getElementById('next').onclick=()=>goWeek(1);
+
+/* ---------- COPIA ---------- */
+document.getElementById('exportBtn').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
+  a.download='mi-semana-'+iso(new Date())+'.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!d.acts||!d.log) throw 0;
+    if(!d.diet) d.diet=state.diet;          // copias antiguas sin dieta
+    if(confirm('¿Sustituir todo por esta copia?')){ state=normalize(d); save(); render(); }
+  }catch{ alert('Ese archivo no es una copia válida.'); }
+  e.target.value='';
+};
+
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) render(); });
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+</script>
+</body>
+</html>
